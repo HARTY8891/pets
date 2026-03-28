@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PawFinds — מוצרים מומלצים לחיות מחמד</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/papaparse@5/papaparse.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+const { useState, useEffect, useCallback } = React;
+
+/* ─── Design Tokens (CSS) ─── */
+const css = `
+@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&family=DM+Serif+Display:ital@0;1&display=swap');
+
+:root {
+  --navy: #1B2B4B;
+  --navy-hover: #2E4270;
+  --blush: #F9EEE8;
+  --blush-border: #EDD8CC;
+  --rose: #C96A52;
+  --rose-hover: #B05540;
+  --gold: #E8B84B;
+  --gold-bg: #FDF6E3;
+  --teal: #3D8C8C;
+  --text: #1A1A2E;
+  --text-muted: #6B7280;
+  --text-light: rgba(255,255,255,0.65);
+  --white: #FFFFFF;
+  --dark-footer: #111827;
+  --shadow-card: 0 4px 24px rgba(27,43,75,0.09);
+  --shadow-hover: 0 14px 44px rgba(27,43,75,0.16);
+  --shadow-nav: 0 2px 20px rgba(27,43,75,0.18);
+  --radius-lg: 16px;
+  --radius-md: 10px;
+  --radius-sm: 6px;
+  --radius-pill: 50px;
+  --font-display: 'DM Serif Display', serif;
+  --font-body: 'Heebo', sans-serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--font-body);
+  direction: rtl;
+  color: var(--text);
+  background: var(--white);
+  overflow-x: hidden;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── NAV ─── */
+.nav {
+  height: 58px;
+  background: var(--navy);
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  box-shadow: var(--shadow-nav);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 48px;
+}
+.nav-logo {
+  background: none; border: none; cursor: pointer;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  color: white;
+  direction: ltr;
+  display: flex; align-items: center; gap: 4px;
+}
+.nav-logo .gold { color: var(--gold); }
+.nav-links { list-style: none; display: flex; gap: 4px; align-items: center; }
+.nav-links button {
+  background: none; border: none; cursor: pointer;
+  font-family: var(--font-body);
+  font-weight: 500; font-size: 0.82rem;
+  color: rgba(255,255,255,0.6);
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  transition: all 0.2s ease;
+}
+.nav-links button:hover { color: white; background: rgba(255,255,255,0.08); }
+.nav-links button.active { color: var(--gold); background: rgba(232,184,75,0.12); font-weight: 700; }
+
+
+/* ─── HERO ─── */
+.hero {
+  display: grid; grid-template-columns: 1fr 1fr;
+  min-height: 54vh; background: var(--blush);
+}
+.hero-content {
+  padding: 64px 72px; display: flex; flex-direction: column; justify-content: center; gap: 20px;
+}
+.hero-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--navy); color: var(--gold);
+  padding: 6px 16px; border-radius: var(--radius-pill);
+  font-size: 0.72rem; font-weight: 600; width: fit-content;
+}
+.hero h1 {
+  font-family: var(--font-body); font-weight: 800;
+  font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+  line-height: 1.3; color: var(--navy);
+}
+.hero h1 em {
+  color: var(--rose); font-style: normal;
+  position: relative; display: inline;
+}
+.hero h1 em::after {
+  content: ''; position: absolute; bottom: 2px; right: 0; width: 100%; height: 3px;
+  background: var(--gold); border-radius: 2px;
+}
+.hero-subtitle {
+  color: var(--text-muted); font-weight: 300; font-size: 0.95rem;
+  max-width: 380px; line-height: 1.7;
+}
+.hero-cta-row { display: flex; gap: 12px; flex-wrap: wrap; }
+.btn-primary {
+  background: var(--rose); color: white; border: none; cursor: pointer;
+  padding: 12px 28px; border-radius: var(--radius-pill);
+  font-family: var(--font-body); font-weight: 600; font-size: 0.88rem;
+  transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 6px;
+}
+.btn-primary:hover { background: var(--rose-hover); }
+.btn-secondary {
+  background: transparent; color: var(--navy); border: 2px solid var(--navy);
+  padding: 10px 24px; border-radius: var(--radius-pill);
+  font-family: var(--font-body); font-weight: 600; font-size: 0.88rem;
+  cursor: pointer; transition: all 0.2s ease;
+}
+.btn-secondary:hover { background: var(--navy); color: white; }
+.hero-stats {
+  display: flex; gap: 32px; padding-top: 20px; margin-top: 12px;
+  border-top: 1px solid var(--blush-border); flex-wrap: wrap;
+}
+.hero-stat { text-align: center; }
+.hero-stat .num { font-family: var(--font-display); font-size: 1.3rem; color: var(--navy); display: block; }
+.hero-stat .label { font-size: 0.72rem; color: var(--text-muted); }
+.hero-image {
+  position: relative; overflow: hidden;
+}
+.hero-image img {
+  width: 100%; height: 100%; object-fit: cover;
+}
+.hero-image::before {
+  content: ''; position: absolute; top: 0; right: 0; bottom: 0;
+  width: 80px; z-index: 2;
+  background: linear-gradient(to left, var(--blush), transparent);
+}
+
+/* ─── SECTIONS ─── */
+.section { padding: 48px 72px; }
+.section-eyebrow {
+  color: var(--teal); font-size: 0.68rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 2px; margin-bottom: 6px;
+}
+.section-title {
+  font-family: var(--font-body); font-weight: 800;
+  font-size: clamp(1.5rem, 2.6vw, 2.2rem); color: var(--navy); margin-bottom: 24px;
+}
+
+/* ─── CATEGORY TABS ─── */
+.cat-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px; }
+.cat-tab {
+  background: var(--white); border: 1.5px solid #E0E0E0; color: var(--text-muted);
+  padding: 8px 18px; border-radius: var(--radius-pill);
+  font-family: var(--font-body); font-size: 0.82rem; font-weight: 500;
+  cursor: pointer; transition: all 0.2s ease;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.cat-tab:hover { border-color: var(--navy); color: var(--navy); }
+.cat-tab.active { background: var(--navy); border-color: var(--navy); color: white; }
+
+/* ─── PRODUCTS HEADER ─── */
+.products-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 18px;
+}
+.products-count { font-size: 0.82rem; color: var(--text-muted); }
+.sort-select {
+  padding: 8px 14px; border: 1.5px solid #E0E0E0; border-radius: var(--radius-md);
+  font-family: var(--font-body); font-size: 0.82rem; color: var(--text);
+  background: white; cursor: pointer;
+}
+
+/* ─── PRODUCT GRID ─── */
+.product-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px;
+}
+.grid-featured {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; margin-bottom: 24px;
+}
+
+/* ─── PRODUCT CARD ─── */
+.card {
+  background: var(--white); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card); overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: fadeUp 0.5s ease both;
+}
+.card:hover { transform: translateY(-5px); box-shadow: var(--shadow-hover); }
+.card-image-wrap {
+  position: relative; overflow: hidden; aspect-ratio: 4/3;
+  background: var(--gold-bg);
+}
+.grid-featured .card-image-wrap { aspect-ratio: 3/2; }
+.card-image-wrap img {
+  width: 100%; height: 100%; object-fit: cover;
+  transition: transform 0.5s ease;
+}
+.card:hover .card-image-wrap img { transform: scale(1.06); }
+.badge {
+  position: absolute; top: 12px; left: 12px;
+  padding: 4px 12px; border-radius: var(--radius-pill);
+  font-size: 0.68rem; font-weight: 700;
+}
+.badge-top { background: var(--navy); color: var(--gold); }
+.badge-drop { background: var(--rose); color: white; }
+.badge-new { background: var(--teal); color: white; }
+.wishlist-btn {
+  position: absolute; top: 12px; right: 12px;
+  width: 34px; height: 34px; border-radius: 50%;
+  background: rgba(255,255,255,0.9); border: none; cursor: pointer;
+  font-size: 1.1rem; display: flex; align-items: center; justify-content: center;
+  transition: transform 0.2s ease;
+}
+.wishlist-btn:hover { transform: scale(1.15); }
+.wishlist-btn.active { color: #EF4444; }
+.card-body { padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+.category-labels { display: flex; flex-wrap: wrap; gap: 6px; }
+.category-label {
+  display: inline-flex; align-items: center; gap: 4px;
+  color: var(--teal); font-size: 0.68rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 1px;
+  background: rgba(61,140,140,0.08); padding: 2px 8px; border-radius: var(--radius-pill);
+}
+.card-title {
+  font-weight: 700; font-size: 1.1rem; line-height: 1.4;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.rating-row {
+  display: flex; align-items: center; gap: 6px; font-size: 0.78rem;
+}
+.stars { color: var(--gold); letter-spacing: 1px; }
+.rating-num { font-weight: 600; color: var(--text); }
+.rating-count { color: var(--text-muted); }
+.card-footer {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 4px; padding-top: 12px; border-top: 1px solid #f0f0f0;
+}
+.price-wrap { display: flex; align-items: baseline; gap: 8px; }
+.price-original {
+  text-decoration: line-through; color: var(--text-muted); font-size: 0.82rem;
+}
+.price-current { font-family: var(--font-display); font-size: 1.2rem; color: var(--navy); }
+.price-current.sale { color: var(--rose); }
+.btn-cta {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--rose); color: white;
+  padding: 8px 18px; border-radius: var(--radius-pill);
+  font-family: var(--font-body); font-size: 0.78rem; font-weight: 600;
+  text-decoration: none; transition: background 0.2s ease;
+}
+.btn-cta:hover { background: var(--rose-hover); }
+.btn-cta svg { transform: scaleX(-1); }
+
+/* ─── RANK BAR ─── */
+.rank-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.rank-number { font-family: var(--font-display); font-size: 1rem; color: var(--navy); font-weight: 700; min-width: 28px; }
+.rank-bar-bg { flex: 1; height: 6px; background: #eee; border-radius: 3px; overflow: hidden; }
+.rank-bar-fill { height: 100%; border-radius: 3px; background: linear-gradient(to left, var(--gold), var(--rose)); }
+
+/* ─── TRUST BAR ─── */
+.trust-section { background: var(--navy); padding: 40px 72px; }
+.trust-pillars {
+  display: flex; justify-content: center; align-items: center; gap: 40px;
+}
+.trust-divider { width: 1px; height: 48px; background: rgba(255,255,255,0.15); }
+.trust-pillar { display: flex; align-items: center; gap: 14px; }
+.trust-icon {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: rgba(255,255,255,0.1);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.1rem; flex-shrink: 0;
+}
+.trust-text-title { color: white; font-weight: 600; font-size: 0.82rem; }
+.trust-text-desc { color: var(--text-light); font-size: 0.72rem; }
+.disclosure-bar {
+  background: var(--blush); padding: 14px 72px;
+  text-align: center; font-size: 0.72rem; color: var(--text-muted); line-height: 1.6;
+}
+
+/* ─── PAGE HEADER ─── */
+.page-header {
+  background: var(--blush); padding: 48px 72px 36px;
+  text-align: center;
+}
+.page-header .eyebrow {
+  color: var(--teal); font-size: 0.68rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;
+}
+.page-header h1 {
+  font-family: var(--font-body); font-weight: 800;
+  font-size: clamp(1.5rem, 2.6vw, 2.2rem); color: var(--navy); margin-bottom: 8px;
+}
+.page-header .subtitle { color: var(--text-muted); font-size: 0.88rem; }
+
+/* ─── EMPTY STATE ─── */
+.empty-state {
+  text-align: center; padding: 64px 24px;
+}
+.empty-icon { font-size: 3rem; margin-bottom: 16px; }
+.empty-state p { font-size: 1rem; color: var(--text); font-weight: 600; margin-bottom: 8px; }
+.empty-state small { color: var(--text-muted); font-size: 0.82rem; }
+
+/* ─── ABOUT ─── */
+.about-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center; }
+.about-image { border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-card); }
+.about-image img { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; }
+.about-eyebrow { color: var(--teal); font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px; }
+.about-h2 { font-weight: 800; font-size: 1.4rem; color: var(--navy); margin-bottom: 16px; }
+.about-p { color: var(--text-muted); font-weight: 300; line-height: 1.8; margin-bottom: 12px; font-size: 0.92rem; }
+.values-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px; }
+.value-card {
+  background: var(--blush); border-radius: var(--radius-md); padding: 16px;
+}
+.value-card .vi { font-size: 1.2rem; margin-bottom: 6px; }
+.value-card .vt { font-weight: 700; font-size: 0.82rem; color: var(--navy); }
+.value-card .vd { font-size: 0.72rem; color: var(--text-muted); margin-top: 4px; }
+.team-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 48px; }
+.team-card { text-align: center; }
+.team-avatar {
+  width: 64px; height: 64px; border-radius: 50%; background: var(--navy);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.5rem; margin: 0 auto 12px;
+}
+.team-name { font-weight: 700; font-size: 0.92rem; color: var(--navy); }
+.team-role { font-size: 0.78rem; color: var(--text-muted); margin-top: 4px; }
+.contact-bar {
+  background: var(--navy); padding: 32px 72px; margin-top: 48px;
+  display: flex; justify-content: center; gap: 48px; flex-wrap: wrap;
+}
+.contact-item { color: white; font-size: 0.88rem; display: flex; align-items: center; gap: 8px; }
+
+/* ─── FOOTER ─── */
+.footer {
+  background: var(--dark-footer); padding: 28px 72px;
+  display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
+}
+.footer-logo {
+  background: none; border: none; cursor: pointer;
+  font-family: var(--font-display); font-size: 1.2rem; color: white;
+  direction: ltr; display: flex; align-items: center; gap: 4px;
+}
+.footer-logo .gold { color: var(--gold); }
+.footer-links { display: flex; gap: 8px; list-style: none; }
+.footer-links button {
+  background: none; border: none; cursor: pointer;
+  color: rgba(255,255,255,0.5); font-family: var(--font-body);
+  font-size: 0.78rem; transition: color 0.2s ease;
+}
+.footer-links button:hover { color: white; }
+.footer-copy { color: rgba(255,255,255,0.3); font-size: 0.72rem; }
+
+
+/* ─── RESPONSIVE ─── */
+@media (max-width: 1100px) {
+  .product-grid { grid-template-columns: repeat(2, 1fr); }
+  .section { padding: 36px; }
+}
+@media (max-width: 768px) {
+  .nav { padding: 0 14px; }
+  .nav-links button { font-size: 0.72rem; padding: 5px 8px; }
+  .hero { grid-template-columns: 1fr; min-height: auto; }
+  .hero-image { height: 200px; order: -1; }
+  .hero-image::before { display: none; }
+  .hero-content { padding: 26px 16px; }
+  .hero-stats { flex-wrap: wrap; gap: 14px; }
+  .section, .page-header { padding-left: 16px; padding-right: 16px; }
+  .product-grid, .grid-featured { grid-template-columns: 1fr; }
+  .trust-pillars { flex-direction: column; align-items: flex-start; gap: 14px; }
+  .trust-divider { display: none; }
+  .trust-section { padding: 28px 16px; }
+  .disclosure-bar { padding: 14px 16px; }
+  .about-grid { grid-template-columns: 1fr; }
+  .values-grid { grid-template-columns: 1fr; }
+  .team-grid { grid-template-columns: 1fr 1fr; }
+  .products-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .footer { flex-direction: column; align-items: flex-start; padding: 20px 16px; }
+
+  .contact-bar { padding: 24px 16px; gap: 24px; }
+}
+`;
+
+/* ─── FALLBACK DATA ─── */
+const FALLBACK_CATEGORIES = [
+  { id: 'dogs', label: 'לכלבים', icon: '🐶', sort_order: 1 },
+  { id: 'cats', label: 'לחתולים', icon: '🐱', sort_order: 2 },
+  { id: 'tech', label: 'טכנולוגיה', icon: '📡', sort_order: 3 },
+  { id: 'beds', label: 'מיטות', icon: '🛏️', sort_order: 4 },
+  { id: 'toys', label: 'צעצועים', icon: '🎾', sort_order: 5 },
+];
+
+const FALLBACK_PRODUCTS = [
+  { id:1, category_ids:['dogs'], title:'רצועה אוטומטית נמתחת 5 מטר', badge:'top', badge_label:'מדורג ביותר', image_url:'https://images.unsplash.com/photo-1587300003388-59208cc962cb?w=600&h=400&fit=crop', rating:4.8, reviews:2340, price:'32', original_price:'59', affiliate_link:'#', is_recommended:true, is_new:false, is_bestseller:true },
+  { id:2, category_ids:['cats','toys'], title:'צעצוע עכבר אינטראקטיבי עם נוצות', badge:'new', badge_label:'חדש', image_url:'https://images.unsplash.com/photo-1574158622682-e40e69881006?w=600&h=400&fit=crop', rating:4.6, reviews:870, price:'18', original_price:'', affiliate_link:'#', is_recommended:true, is_new:true, is_bestseller:false },
+  { id:3, category_ids:['tech','cats','dogs'], title:'מזרקת מים חכמה לחיות מחמד 2.5L', badge:'top', badge_label:'הכי נמכר', image_url:'https://images.unsplash.com/photo-1583337130417-13104dec14c3?w=600&h=400&fit=crop', rating:4.9, reviews:3100, price:'89', original_price:'149', affiliate_link:'#', is_recommended:true, is_new:false, is_bestseller:true },
+  { id:4, category_ids:['beds','cats','dogs'], title:'מיטת דונאט רכה במיוחד לחתולים וכלבים', badge:'drop', badge_label:'ירידת מחיר', image_url:'https://images.unsplash.com/photo-1545249390-6bdfa286032f?w=600&h=400&fit=crop', rating:4.7, reviews:1560, price:'47', original_price:'89', affiliate_link:'#', is_recommended:true, is_new:false, is_bestseller:true },
+  { id:5, category_ids:['toys','dogs'], title:'כדור גומי בלתי ניתן להריסה לכלבים', badge:'', badge_label:'', image_url:'https://images.unsplash.com/photo-1535930749574-1399327ce78f?w=600&h=400&fit=crop', rating:4.5, reviews:980, price:'15', original_price:'', affiliate_link:'#', is_recommended:false, is_new:true, is_bestseller:false },
+  { id:6, category_ids:['dogs'], title:'מנשא גב נשימתי לכלבים קטנים', badge:'new', badge_label:'חדש', image_url:'https://images.unsplash.com/photo-1601758228041-f3b2795255f1?w=600&h=400&fit=crop', rating:4.4, reviews:420, price:'75', original_price:'120', affiliate_link:'#', is_recommended:false, is_new:true, is_bestseller:false },
+  { id:7, category_ids:['cats'], title:'מתקן גירוד רב-קומתי עם ערסל', badge:'top', badge_label:'מדורג ביותר', image_url:'https://images.unsplash.com/photo-1526336024174-e58f5cdd8e13?w=600&h=400&fit=crop', rating:4.8, reviews:2100, price:'125', original_price:'199', affiliate_link:'#', is_recommended:true, is_new:false, is_bestseller:true },
+  { id:8, category_ids:['tech','dogs'], title:'קולר GPS חכם עם מעקב בזמן אמת', badge:'drop', badge_label:'ירידת מחיר', image_url:'https://images.unsplash.com/photo-1560807707-8cc77767d783?w=600&h=400&fit=crop', rating:4.3, reviews:650, price:'149', original_price:'249', affiliate_link:'#', is_recommended:false, is_new:true, is_bestseller:true },
+];
+
+/* ─── HELPERS ─── */
+function normalizeProduct(row) {
+  const yesNo = (v) => String(v ?? '').trim().toLowerCase() === 'yes';
+  return {
+    id: parseInt(row.id) || 0,
+    category_ids: String(row.category_ids || row.category_id || row.category || '').split(',').map(s => s.trim()).filter(Boolean),
+    title: String(row.title || '').trim(),
+    badge: String(row.badge || '').trim().toLowerCase(),
+    badge_label: String(row.badge_label || '').trim(),
+    image_url: String(row.image_url || row.image || '').trim(),
+    rating: parseFloat(row.rating) || 0,
+    reviews: parseInt(row.reviews) || 0,
+    price: String(row.price || '').trim(),
+    original_price: String(row.original_price || '').trim(),
+    affiliate_link: String(row.affiliate_link || row.link || '#').trim() || '#',
+    is_recommended: yesNo(row.is_recommended),
+    is_new: yesNo(row.is_new),
+    is_bestseller: yesNo(row.is_bestseller),
+  };
+}
+
+function normalizeCategory(row) {
+  return {
+    id: String(row.id || '').trim(),
+    label: String(row.label || row.name || row.id || '').trim(),
+    icon: String(row.icon || '🐾').trim(),
+    sort_order: parseInt(row.sort_order) || 99,
+  };
+}
+
+function buildStars(rating) {
+  let s = '';
+  const full = Math.floor(rating);
+  const half = rating % 1 >= 0.5;
+  for (let i = 0; i < full; i++) s += '★';
+  if (half) s += '☆';
+  return s;
+}
+
+function applySorting(list, sortValue) {
+  const copy = [...list];
+  switch (sortValue) {
+    case 'price_asc': return copy.sort((a, b) => parseFloat(a.price) - parseFloat(b.price));
+    case 'price_desc': return copy.sort((a, b) => parseFloat(b.price) - parseFloat(a.price));
+    case 'rating': return copy.sort((a, b) => b.rating - a.rating);
+    default: return copy;
+  }
+}
+
+const FALLBACK_IMG = 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=600&h=400&fit=crop';
+
+/* ─── COMPONENTS ─── */
+
+function Nav({ currentPage, onNavigate }) {
+  const pages = [
+    { id: 'home', label: 'ראשי' },
+    { id: 'recommended', label: 'המלצות שלנו' },
+    { id: 'new', label: 'חדש בחנות' },
+    { id: 'bestsellers', label: 'הנמכרים ביותר' },
+    { id: 'about', label: 'אודות' },
+  ];
+  return (
+    <nav className="nav">
+      <button className="nav-logo" onClick={() => onNavigate('home')}>
+        🐾 <span>Paw</span><span className="gold">Finds</span>
+      </button>
+      <ul className="nav-links">
+        {pages.map(p => (
+          <li key={p.id}>
+            <button className={currentPage === p.id ? 'active' : ''} onClick={() => onNavigate(p.id)}>
+              {p.label}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+}
+
+
+function ProductCard({ product, categories, rank, maxReviews }) {
+  const [wished, setWished] = useState(false);
+  const cats = categories.filter(c => product.category_ids.includes(c.id));
+  const hasDiscount = product.original_price && product.original_price.trim() !== '';
+  const badgeClass = product.badge === 'top' ? 'badge-top' : product.badge === 'drop' ? 'badge-drop' : product.badge === 'new' ? 'badge-new' : '';
+
+  return (
+    <div className="card">
+      <div className="card-image-wrap">
+        <img src={product.image_url || FALLBACK_IMG} alt={product.title} onError={(e) => { e.target.src = FALLBACK_IMG; }} />
+        {product.badge && badgeClass && <span className={`badge ${badgeClass}`}>{product.badge_label}</span>}
+        <button className={`wishlist-btn ${wished ? 'active' : ''}`} onClick={() => setWished(!wished)} aria-label={wished ? 'הסר מהמועדפים' : 'הוסף למועדפים'}>
+          {wished ? '♥' : '♡'}
+        </button>
+      </div>
+      <div className="card-body">
+        {rank !== undefined && (
+          <div className="rank-row">
+            <span className="rank-number">#{rank + 1}</span>
+            <div className="rank-bar-bg">
+              <div className="rank-bar-fill" style={{ width: `${Math.round((product.reviews / maxReviews) * 100)}%` }} />
+            </div>
+          </div>
+        )}
+        {cats.length > 0 && <div className="category-labels">{cats.map(c => <span key={c.id} className="category-label"><span>{c.icon}</span> {c.label}</span>)}</div>}
+        <h3 className="card-title">{product.title}</h3>
+        <div className="rating-row">
+          <span className="stars">{buildStars(product.rating)}</span>
+          <span className="rating-num">{product.rating}</span>
+          <span className="rating-count">({product.reviews.toLocaleString()})</span>
+        </div>
+        <div className="card-footer">
+          <div className="price-wrap">
+            {hasDiscount && <span className="price-original">₪{product.original_price}</span>}
+            <span className={`price-current ${hasDiscount ? 'sale' : ''}`}>₪{product.price}</span>
+          </div>
+          <a href={product.affiliate_link !== '#' ? product.affiliate_link : '#'} target="_blank" rel="nofollow noopener sponsored" className="btn-cta">
+            לבדיקת מחיר
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{transform:'scaleX(-1)'}}>
+              <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CategoryTabs({ categories, activeFilter, onFilterChange }) {
+  return (
+    <div className="cat-tabs">
+      <button className={`cat-tab ${activeFilter === 'all' ? 'active' : ''}`} onClick={() => onFilterChange('all')}>
+        <span>✦</span> כל המוצרים
+      </button>
+      {categories.map(cat => (
+        <button key={cat.id} className={`cat-tab ${activeFilter === cat.id ? 'active' : ''}`} onClick={() => onFilterChange(cat.id)}>
+          <span>{cat.icon}</span> {cat.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function TrustBar() {
+  const pillars = [
+    { icon: '🔍', title: 'מחקר עצמאי', desc: 'בודקים לפני שממליצים' },
+    { icon: '⭐', title: 'רק דירוגים גבוהים', desc: 'לפחות 4.5★ מהמוכר' },
+    { icon: '💙', title: 'ללא הטיה מסחרית', desc: 'המלצות אמיתיות ואמינות' },
+    { icon: '🔗', title: 'גילוי נאות', desc: 'קניות דרך הלינקים מרוויחות לנו עמלה קטנה' },
+  ];
+  return (
+    <>
+      <div className="trust-section">
+        <div className="trust-pillars">
+          {pillars.map((p, i) => (
+            <React.Fragment key={i}>
+              {i > 0 && <div className="trust-divider" />}
+              <div className="trust-pillar">
+                <div className="trust-icon">{p.icon}</div>
+                <div>
+                  <div className="trust-text-title">{p.title}</div>
+                  <div className="trust-text-desc">{p.desc}</div>
+                </div>
+              </div>
+            </React.Fragment>
+          ))}
+        </div>
+      </div>
+      <div className="disclosure-bar">
+        אנחנו חוקרים ובודקים מוצרים כדי שאתם לא תצטרכו. רכישות דרך הקישורים שלנו עשויות להרוויח לנו עמלה קטנה — ללא עלות נוספת עבורכם.
+      </div>
+    </>
+  );
+}
+
+function EmptyState({ icon, message, hint }) {
+  return (
+    <div className="empty-state">
+      <div className="empty-icon">{icon}</div>
+      <p>{message}</p>
+      <small>{hint}</small>
+    </div>
+  );
+}
+
+function PageHeader({ eyebrow, title, subtitle }) {
+  return (
+    <div className="page-header">
+      <p className="eyebrow">{eyebrow}</p>
+      <h1>{title}</h1>
+      {subtitle && <p className="subtitle">{subtitle}</p>}
+    </div>
+  );
+}
+
+/* ─── PAGES ─── */
+
+function HomePage({ products, categories, onNavigate }) {
+  const [filter, setFilter] = useState('all');
+  const [sort, setSort] = useState('default');
+
+  const filtered = filter === 'all' ? products : products.filter(p => p.category_ids.includes(filter));
+  const sorted = applySorting(filtered, sort);
+
+  return (
+    <>
+      {/* HERO */}
+      <div className="hero">
+        <div className="hero-content">
+          <div className="hero-pill">✦ נבדק ונבחר בקפידה</div>
+          <h1>מוצרים מעולים לחבר ה<em>כי אהוב</em> שלך — במחיר שמפתיע לטובה</h1>
+          <p className="hero-subtitle">אנחנו בודקים, משווים וממליצים על מוצרי חיות המחמד הכי שווים — כדי שתוכלו לפנק בלי לחשוב פעמיים.</p>
+          <div className="hero-cta-row">
+            <button className="btn-primary" onClick={() => onNavigate('recommended')}>המלצות שלנו ←</button>
+            <button className="btn-secondary" onClick={() => onNavigate('new')}>חדש בחנות</button>
+          </div>
+          <div className="hero-stats">
+            <div className="hero-stat"><span className="num">{products.length}+</span><span className="label">מוצרים שנבדקו</span></div>
+            <div className="hero-stat"><span className="num">4.8★</span><span className="label">ממוצע דירוג</span></div>
+            <div className="hero-stat"><span className="num">12K+</span><span className="label">בעלי חיות שמחים</span></div>
+          </div>
+        </div>
+        <div className="hero-image">
+          <img src="https://images.unsplash.com/photo-1587300003388-59208cc962cb?w=800&h=600&fit=crop" alt="כלב שמח" onError={(e) => { e.target.src = FALLBACK_IMG; }} />
+        </div>
+      </div>
+
+      {/* CATEGORY FILTER */}
+      <div className="section">
+        <p className="section-eyebrow">עיין לפי קטגוריה</p>
+        <h2 className="section-title">מה מחפשים היום?</h2>
+        <CategoryTabs categories={categories} activeFilter={filter} onFilterChange={setFilter} />
+
+        <div className="products-header">
+          <span className="products-count">מציג {sorted.length} מוצרים</span>
+          <select className="sort-select" value={sort} onChange={e => setSort(e.target.value)}>
+            <option value="default">מיין: ברירת מחדל</option>
+            <option value="price_asc">מחיר: מנמוך לגבוה</option>
+            <option value="price_desc">מחיר: מגבוה לנמוך</option>
+            <option value="rating">לפי דירוג</option>
+          </select>
+        </div>
+        <div className="product-grid">
+          {sorted.map((p, i) => (
+            <ProductCard key={p.id} product={p} categories={categories} style={{ animationDelay: `${i * 0.065}s` }} />
+          ))}
+        </div>
+      </div>
+
+      <TrustBar />
+    </>
+  );
+}
+
+function RecommendedPage({ products, categories }) {
+  const list = products.filter(p => p.is_recommended);
+  if (list.length === 0) {
+    return (
+      <>
+        <PageHeader eyebrow="✦ נבחר בקפידה" title="המלצות שלנו" />
+        <EmptyState icon="💙" message="אין מוצרים מסומנים כהמלצות" hint="סמן is_recommended=yes בקובץ ה-CSV" />
+      </>
+    );
+  }
+  const featured = list.slice(0, 2);
+  const rest = list.slice(2);
+  return (
+    <>
+      <PageHeader eyebrow="✦ נבחר בקפידה" title="המלצות שלנו" />
+      <div className="section">
+        {featured.length > 0 && (
+          <div className="grid-featured">
+            {featured.map((p, i) => <ProductCard key={p.id} product={p} categories={categories} />)}
+          </div>
+        )}
+        {rest.length > 0 && (
+          <div className="product-grid">
+            {rest.map((p, i) => <ProductCard key={p.id} product={p} categories={categories} />)}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+function NewPage({ products, categories }) {
+  const list = products.filter(p => p.is_new);
+  return (
+    <>
+      <PageHeader eyebrow="🆕 זה עתה הגיע" title="חדש בחנות" />
+      <div className="section">
+        {list.length === 0 ? (
+          <EmptyState icon="🆕" message="אין מוצרים חדשים כרגע" hint="סמן is_new=yes בקובץ ה-CSV" />
+        ) : (
+          <div className="product-grid">
+            {list.map((p, i) => <ProductCard key={p.id} product={p} categories={categories} />)}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+function BestsellersPage({ products, categories }) {
+  const list = products.filter(p => p.is_bestseller).sort((a, b) => b.reviews - a.reviews);
+  const maxReviews = list[0]?.reviews ?? 1;
+  return (
+    <>
+      <PageHeader eyebrow="🔥 בוחרים הכי הרבה" title="הנמכרים ביותר" />
+      <div className="section">
+        {list.length === 0 ? (
+          <EmptyState icon="🔥" message="אין מוצרים מסומנים כנמכרים ביותר" hint="סמן is_bestseller=yes בקובץ ה-CSV" />
+        ) : (
+          <div className="product-grid">
+            {list.map((p, i) => <ProductCard key={p.id} product={p} categories={categories} rank={i} maxReviews={maxReviews} />)}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+function AboutPage({ onNavigate }) {
+  return (
+    <>
+      <PageHeader eyebrow="👋 מי אנחנו" title="אודות PawFinds" />
+      <div className="section">
+        <div className="about-grid">
+          <div className="about-image">
+            <img src="https://images.unsplash.com/photo-1450778869180-cfe0112515ba?w=600&h=450&fit=crop" alt="חיות מחמד" onError={(e) => { e.target.src = FALLBACK_IMG; }} />
+          </div>
+          <div>
+            <p className="about-eyebrow">הסיפור שלנו</p>
+            <h2 className="about-h2">נולדנו מאהבה לחיות מחמד</h2>
+            <p className="about-p">התחלנו כקבוצה של חובבי חיות שנמאס להם לקנות מוצרים שלא עומדים בציפיות. אחרי עשרות רכישות מאכזבות, החלטנו לעשות את המחקר בעצמנו — ולחלוק את הממצאים עם כולם.</p>
+            <p className="about-p">כל מוצר באתר עבר בדיקה קפדנית. אנחנו קוראים אלפי ביקורות, בודקים דירוגים, משווים מחירים ובוחרים רק את מה שבאמת שווה את הכסף.</p>
+            <div className="values-grid">
+              <div className="value-card"><div className="vi">🔍</div><div className="vt">שקיפות מלאה</div><div className="vd">גילוי נאות על כל קישור</div></div>
+              <div className="value-card"><div className="vi">💙</div><div className="vt">רק הטוב ביותר</div><div className="vd">סינון קפדני של מוצרים</div></div>
+              <div className="value-card"><div className="vi">🐾</div><div className="vt">נבדק בפועל</div><div className="vd">מבוסס על ביקורות אמיתיות</div></div>
+              <div className="value-card"><div className="vi">💰</div><div className="vt">מחיר הוגן</div><div className="vd">השוואת מחירים שוטפת</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div className="team-grid">
+          <div className="team-card">
+            <div className="team-avatar">👩</div>
+            <div className="team-name">מיכל כהן</div>
+            <div className="team-role">מייסדת & בודקת ראשית</div>
+          </div>
+          <div className="team-card">
+            <div className="team-avatar">👨</div>
+            <div className="team-name">עמית לוי</div>
+            <div className="team-role">מומחה ציוד טכנולוגי</div>
+          </div>
+          <div className="team-card">
+            <div className="team-avatar">👩</div>
+            <div className="team-name">נועה שרון</div>
+            <div className="team-role">כותבת תוכן & חובבת חתולים</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="contact-bar">
+        <div className="contact-item">📧 צרו קשר</div>
+        <div className="contact-item">📱 אינסטגרם</div>
+        <div className="contact-item">🔗 גילוי נאות</div>
+      </div>
+    </>
+  );
+}
+
+function Footer({ onNavigate }) {
+  const pages = [
+    { id: 'home', label: 'ראשי' },
+    { id: 'recommended', label: 'המלצות' },
+    { id: 'new', label: 'חדש' },
+    { id: 'bestsellers', label: 'נמכרים' },
+    { id: 'about', label: 'אודות' },
+  ];
+  return (
+    <footer className="footer">
+      <button className="footer-logo" onClick={() => onNavigate('home')}>
+        🐾 <span>Paw</span><span className="gold">Finds</span>
+      </button>
+      <ul className="footer-links">
+        {pages.map(p => (
+          <li key={p.id}><button onClick={() => onNavigate(p.id)}>{p.label}</button></li>
+        ))}
+      </ul>
+      <span className="footer-copy">© 2026 PawFinds. כל הזכויות שמורות.</span>
+    </footer>
+  );
+}
+
+/* ─── CSV LOADER ─── */
+function loadCSV(url) {
+  return new Promise((resolve, reject) => {
+    Papa.parse(url, {
+      download: true, header: true, skipEmptyLines: true,
+      complete: (r) => resolve(r.data),
+      error: (e) => reject(e),
+    });
+  });
+}
+
+/* ─── APP ─── */
+function App() {
+  const [page, setPage] = useState('home');
+  const [products, setProducts] = useState(FALLBACK_PRODUCTS);
+  const [categories, setCategories] = useState(FALLBACK_CATEGORIES);
+
+  useEffect(() => {
+    async function fetchCSV() {
+      try {
+        const [prodRows, catRows] = await Promise.all([
+          loadCSV('products.csv').catch(() => null),
+          loadCSV('categories.csv').catch(() => null),
+        ]);
+        if (catRows && catRows.length > 0) {
+          setCategories(catRows.map(normalizeCategory));
+        }
+        if (prodRows && prodRows.length > 0) {
+          setProducts(prodRows.map(normalizeProduct));
+        }
+        console.log(`✅ PawFinds: loaded ${prodRows?.length || 0} products, ${catRows?.length || 0} categories from CSV`);
+      } catch (e) {
+        console.log('ℹ️ PawFinds: CSV not found, using fallback data');
+      }
+    }
+    fetchCSV();
+  }, []);
+
+  function goToPage(pageId) {
+    setPage(pageId);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  return (
+    <>
+      <style>{css}</style>
+      <Nav currentPage={page} onNavigate={goToPage} />
+
+      {page === 'home' && <HomePage products={products} categories={categories} onNavigate={goToPage} />}
+      {page === 'recommended' && <RecommendedPage products={products} categories={categories} />}
+      {page === 'new' && <NewPage products={products} categories={categories} />}
+      {page === 'bestsellers' && <BestsellersPage products={products} categories={categories} />}
+      {page === 'about' && <AboutPage onNavigate={goToPage} />}
+
+      <Footer onNavigate={goToPage} />
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

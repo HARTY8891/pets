@@ -1,0 +1,9 @@
+id,category_ids,title,badge,badge_label,image_url,rating,reviews,price,original_price,affiliate_link,is_recommended,is_new,is_bestseller
+1,dogs,רצועה אוטומטית נמתחת 5 מטר,top,מדורג ביותר,https://images.unsplash.com/photo-1587300003388-59208cc962cb?w=600&h=400&fit=crop,4.8,2340,555,59,https://he.aliexpress.com/?dp=CjwKCAjw-J3OBhBuEiwAwqZ_hw0twUHxqatlV691D1nSMbx4DT7du9ZTqJuJt6ptU_0fvqUaNQPEthoCzzYQAvD_BwE&af=1179654&cv=47843&mall_affr=pr3&utm_source=admitad&utm_medium=cpa&utm_campaign=1179654&utm_content=47843&gad_source=1&gad_campaignid=23589187111&gbraid=0AAAAAok9fY0G7gOk8epZ9m05TXDmfJtR7&gclid=CjwKCAjw-J3OBhBuEiwAwqZ_hw0twUHxqatlV691D1nSMbx4DT7du9ZTqJuJt6ptU_0fvqUaNQPEthoCzzYQAvD_BwE&gatewayAdapt=glo2isr,yes,no,yes
+2,"cats,toys",צעצוע עכבר אינטראקטיבי עם נוצות,new,חדש,https://images.unsplash.com/photo-1574158622682-e40e69881006?w=600&h=400&fit=crop,4.6,870,18,,#,yes,yes,no
+3,"tech,cats,dogs",מזרקת מים חכמה לחיות מחמד 2.5L,top,הכי נמכר,https://images.unsplash.com/photo-1583337130417-13104dec14c3?w=600&h=400&fit=crop,4.9,3100,89,149,#,yes,no,yes
+4,"beds,cats,dogs",מיטת דונאט רכה במיוחד לחתולים וכלבים,drop,ירידת מחיר,https://images.unsplash.com/photo-1545249390-6bdfa286032f?w=600&h=400&fit=crop,4.7,1560,47,89,#,yes,no,yes
+5,"toys,dogs",כדור גומי בלתי ניתן להריסה לכלבים,,,https://images.unsplash.com/photo-1535930749574-1399327ce78f?w=600&h=400&fit=crop,4.5,980,15,,#,no,yes,no
+6,dogs,מנשא גב נשימתי לכלבים קטנים,new,חדש,https://images.unsplash.com/photo-1601758228041-f3b2795255f1?w=600&h=400&fit=crop,4.4,420,75,120,#,no,yes,no
+7,cats,מתקן גירוד רב-קומתי עם ערסל,top,מדורג ביותר,https://images.unsplash.com/photo-1526336024174-e58f5cdd8e13?w=600&h=400&fit=crop,4.8,2100,125,199,#,yes,no,yes
+8,"tech,dogs",קולר GPS חכם עם מעקב בזמן אמת,drop,ירידת מחיר,https://images.unsplash.com/photo-1560807707-8cc77767d783?w=600&h=400&fit=crop,4.3,650,149,249,#,no,yes,yes
