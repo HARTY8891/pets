@@ -12,35 +12,91 @@
 <body>
   <div id="root"></div>
   <script type="text/babel">
-const { useState, useEffect, useCallback } = React;
+const { useState, useEffect, useCallback, useRef } = React;
+
+/* ─── Scroll Reveal Hook ─── */
+function useScrollReveal(opts = {}) {
+  const ref = useRef(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([e]) => { if (e.isIntersecting) { setVisible(true); obs.unobserve(el); } },
+      { threshold: 0.08, rootMargin: '0px 0px -30px 0px', ...opts }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+  return [ref, visible];
+}
 
 /* ─── Design Tokens (CSS) ─── */
 const css = `
-@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&family=DM+Serif+Display:ital@0;1&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&family=Playfair+Display:wght@400;500;600;700&display=swap');
 
 :root {
-  --navy: #1B2B4B;
-  --navy-hover: #2E4270;
-  --blush: #F9EEE8;
-  --blush-border: #EDD8CC;
-  --rose: #C96A52;
-  --rose-hover: #B05540;
-  --gold: #E8B84B;
-  --gold-bg: #FDF6E3;
-  --teal: #3D8C8C;
-  --text: #1A1A2E;
-  --text-muted: #6B7280;
-  --text-light: rgba(255,255,255,0.65);
+  /* Primary */
+  --navy: #1A1F36;
+  --navy-hover: #2D3350;
+  --navy-light: #F8F9FC;
+
+  /* Accents */
+  --rose: #D4705A;
+  --rose-hover: #BF5E49;
+  --rose-light: rgba(212,112,90,0.08);
+  --gold: #C9A84C;
+  --gold-bg: #FBF8F0;
+  --teal: #4A9E9E;
+  --teal-light: rgba(74,158,158,0.08);
+
+  /* Neutrals */
+  --bg: #FAFAFA;
   --white: #FFFFFF;
-  --dark-footer: #111827;
-  --shadow-card: 0 4px 24px rgba(27,43,75,0.09);
-  --shadow-hover: 0 14px 44px rgba(27,43,75,0.16);
-  --shadow-nav: 0 2px 20px rgba(27,43,75,0.18);
+  --text: #1A1F36;
+  --text-secondary: #5A6178;
+  --text-muted: #8B90A0;
+  --text-light: rgba(255,255,255,0.7);
+  --border: #ECEDF1;
+  --border-light: #F3F4F6;
+  --dark-footer: #0F1120;
+
+  /* Glassmorphism */
+  --glass-bg: rgba(255,255,255,0.65);
+  --glass-border: rgba(255,255,255,0.3);
+
+  /* Shadows */
+  --shadow-xs: 0 1px 2px rgba(26,31,54,0.04);
+  --shadow-sm: 0 2px 8px rgba(26,31,54,0.06);
+  --shadow-card: 0 4px 20px rgba(26,31,54,0.06);
+  --shadow-hover: 0 12px 40px rgba(26,31,54,0.12);
+  --shadow-nav: 0 1px 0 rgba(26,31,54,0.05);
+
+  /* Radii */
+  --radius-xl: 24px;
   --radius-lg: 16px;
-  --radius-md: 10px;
-  --radius-sm: 6px;
-  --radius-pill: 50px;
-  --font-display: 'DM Serif Display', serif;
+  --radius-md: 12px;
+  --radius-sm: 8px;
+  --radius-pill: 100px;
+
+  /* Spacing */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 40px;
+  --space-2xl: 64px;
+  --space-3xl: 96px;
+
+  /* Transitions */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-fast: 0.15s;
+  --dur-normal: 0.3s;
+  --dur-slow: 0.5s;
+
+  /* Fonts */
+  --font-display: 'Playfair Display', 'DM Serif Display', serif;
   --font-body: 'Heebo', sans-serif;
 }
 
@@ -50,357 +106,571 @@ body {
   font-family: var(--font-body);
   direction: rtl;
   color: var(--text);
-  background: var(--white);
+  background: var(--bg);
   overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
 }
 
+/* ─── ANIMATIONS ─── */
 @keyframes fadeUp {
-  from { opacity: 0; transform: translateY(16px); }
+  from { opacity: 0; transform: translateY(24px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-8px); }
+}
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.3); }
+  50%      { box-shadow: 0 0 0 10px rgba(239,68,68,0); }
+}
+
+/* Scroll reveal */
+.reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.7s var(--ease-out), transform 0.7s var(--ease-out); }
+.reveal.visible { opacity: 1; transform: translateY(0); }
+.stagger.visible > * { animation: fadeUp 0.5s var(--ease-out) both; }
+.stagger.visible > *:nth-child(1) { animation-delay: 0s; }
+.stagger.visible > *:nth-child(2) { animation-delay: 0.07s; }
+.stagger.visible > *:nth-child(3) { animation-delay: 0.14s; }
+.stagger.visible > *:nth-child(4) { animation-delay: 0.21s; }
+.stagger.visible > *:nth-child(5) { animation-delay: 0.28s; }
+.stagger.visible > *:nth-child(6) { animation-delay: 0.35s; }
+.stagger.visible > *:nth-child(7) { animation-delay: 0.42s; }
+.stagger.visible > *:nth-child(8) { animation-delay: 0.49s; }
+.stagger.visible > *:nth-child(9) { animation-delay: 0.56s; }
 
 /* ─── NAV ─── */
 .nav {
-  height: 58px;
-  background: var(--navy);
-  position: sticky;
-  top: 0;
+  height: 64px;
+  background: transparent;
+  position: fixed;
+  top: 0; left: 0; right: 0;
   z-index: 200;
-  box-shadow: var(--shadow-nav);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 48px;
+  padding: 0 var(--space-2xl);
+  transition: all var(--dur-normal) var(--ease-out);
+}
+.nav.scrolled {
+  background: rgba(255,255,255,0.88);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: var(--shadow-nav);
 }
 .nav-logo {
   background: none; border: none; cursor: pointer;
   font-family: var(--font-display);
-  font-size: 1.5rem;
+  font-size: 1.4rem;
   color: white;
   direction: ltr;
-  display: flex; align-items: center; gap: 4px;
+  display: flex; align-items: center; gap: 6px;
+  transition: color var(--dur-normal) ease;
 }
+.nav.scrolled .nav-logo { color: var(--navy); }
 .nav-logo .gold { color: var(--gold); }
 .nav-links { list-style: none; display: flex; gap: 4px; align-items: center; }
 .nav-links button {
   background: none; border: none; cursor: pointer;
   font-family: var(--font-body);
-  font-weight: 500; font-size: 0.82rem;
-  color: rgba(255,255,255,0.6);
-  padding: 6px 14px;
+  font-weight: 500; font-size: 0.85rem;
+  color: rgba(255,255,255,0.7);
+  padding: 8px 16px;
   border-radius: var(--radius-pill);
-  transition: all 0.2s ease;
+  transition: all var(--dur-fast) ease;
 }
-.nav-links button:hover { color: white; background: rgba(255,255,255,0.08); }
-.nav-links button.active { color: var(--gold); background: rgba(232,184,75,0.12); font-weight: 700; }
-
+.nav.scrolled .nav-links button { color: var(--text-secondary); }
+.nav-links button:hover { color: white; background: rgba(255,255,255,0.1); }
+.nav.scrolled .nav-links button:hover { color: var(--navy); background: var(--navy-light); }
+.nav-links button.active { color: var(--gold); background: rgba(201,168,76,0.12); font-weight: 700; }
+.nav.scrolled .nav-links button.active { color: var(--rose); background: var(--rose-light); }
 
 /* ─── HERO ─── */
 .hero {
-  display: grid; grid-template-columns: 1fr 1fr;
-  min-height: 54vh; background: var(--blush);
+  position: relative;
+  min-height: 92vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--navy);
+}
+.hero-bg {
+  position: absolute; inset: 0; z-index: 0;
+}
+.hero-bg img {
+  width: 100%; height: 100%; object-fit: cover;
+  filter: brightness(0.65);
+}
+.hero-bg::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(26,31,54,0.88) 0%, rgba(26,31,54,0.5) 50%, rgba(212,112,90,0.15) 100%);
+}
+.hero-inner {
+  position: relative; z-index: 1;
+  max-width: 1200px; width: 100%;
+  padding: var(--space-3xl) var(--space-2xl);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  gap: var(--space-2xl);
 }
 .hero-content {
-  padding: 64px 72px; display: flex; flex-direction: column; justify-content: center; gap: 20px;
+  display: flex; flex-direction: column;
+  gap: var(--space-lg);
+  animation: fadeUp 0.8s var(--ease-out) both;
 }
 .hero-pill {
-  display: inline-flex; align-items: center; gap: 6px;
-  background: var(--navy); color: var(--gold);
-  padding: 6px 16px; border-radius: var(--radius-pill);
-  font-size: 0.72rem; font-weight: 600; width: fit-content;
+  display: inline-flex; align-items: center; gap: 8px;
+  background: rgba(255,255,255,0.1);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: var(--gold);
+  padding: 8px 20px;
+  border-radius: var(--radius-pill);
+  font-size: 0.75rem; font-weight: 600;
+  letter-spacing: 0.5px; width: fit-content;
 }
 .hero h1 {
-  font-family: var(--font-body); font-weight: 800;
-  font-size: clamp(1.8rem, 3.5vw, 2.8rem);
-  line-height: 1.3; color: var(--navy);
+  font-family: var(--font-body);
+  font-weight: 800;
+  font-size: clamp(2.2rem, 4.5vw, 3.4rem);
+  line-height: 1.2;
+  color: white;
+  letter-spacing: -0.02em;
 }
 .hero h1 em {
-  color: var(--rose); font-style: normal;
+  color: var(--gold); font-style: normal;
   position: relative; display: inline;
 }
 .hero h1 em::after {
-  content: ''; position: absolute; bottom: 2px; right: 0; width: 100%; height: 3px;
-  background: var(--gold); border-radius: 2px;
+  content: ''; position: absolute;
+  bottom: 4px; right: 0; width: 100%; height: 4px;
+  background: var(--rose); border-radius: 2px; opacity: 0.6;
 }
 .hero-subtitle {
-  color: var(--text-muted); font-weight: 300; font-size: 0.95rem;
-  max-width: 380px; line-height: 1.7;
+  color: var(--text-light);
+  font-weight: 300; font-size: 1.05rem;
+  max-width: 440px; line-height: 1.8;
 }
-.hero-cta-row { display: flex; gap: 12px; flex-wrap: wrap; }
+.hero-cta-row { display: flex; gap: var(--space-md); flex-wrap: wrap; padding-top: var(--space-sm); }
+.hero-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+  animation: fadeUp 0.8s var(--ease-out) 0.3s both;
+}
+.hero-stat-card {
+  background: rgba(255,255,255,0.07);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  text-align: center;
+  transition: transform var(--dur-normal) var(--ease-out), background var(--dur-normal) ease;
+}
+.hero-stat-card:hover {
+  transform: translateY(-4px);
+  background: rgba(255,255,255,0.12);
+}
+.hero-stat-card .stat-icon { font-size: 1.5rem; margin-bottom: var(--space-sm); display: block; }
+.hero-stat-card .stat-num {
+  font-family: var(--font-display);
+  font-size: 1.8rem; color: white; display: block; font-weight: 700;
+}
+.hero-stat-card .stat-label { font-size: 0.75rem; color: var(--text-light); margin-top: var(--space-xs); display: block; }
+
+/* ─── BUTTONS ─── */
 .btn-primary {
   background: var(--rose); color: white; border: none; cursor: pointer;
-  padding: 12px 28px; border-radius: var(--radius-pill);
-  font-family: var(--font-body); font-weight: 600; font-size: 0.88rem;
-  transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 6px;
+  padding: 14px 32px; border-radius: var(--radius-pill);
+  font-family: var(--font-body); font-weight: 600; font-size: 0.9rem;
+  transition: all var(--dur-normal) var(--ease-out);
+  display: inline-flex; align-items: center; gap: 8px;
+  box-shadow: 0 4px 16px rgba(212,112,90,0.3);
 }
-.btn-primary:hover { background: var(--rose-hover); }
+.btn-primary:hover {
+  background: var(--rose-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(212,112,90,0.35);
+}
 .btn-secondary {
-  background: transparent; color: var(--navy); border: 2px solid var(--navy);
-  padding: 10px 24px; border-radius: var(--radius-pill);
-  font-family: var(--font-body); font-weight: 600; font-size: 0.88rem;
-  cursor: pointer; transition: all 0.2s ease;
+  background: rgba(255,255,255,0.1); color: white;
+  border: 1.5px solid rgba(255,255,255,0.25);
+  padding: 13px 28px; border-radius: var(--radius-pill);
+  font-family: var(--font-body); font-weight: 600; font-size: 0.9rem;
+  cursor: pointer; backdrop-filter: blur(8px);
+  transition: all var(--dur-normal) var(--ease-out);
 }
-.btn-secondary:hover { background: var(--navy); color: white; }
-.hero-stats {
-  display: flex; gap: 32px; padding-top: 20px; margin-top: 12px;
-  border-top: 1px solid var(--blush-border); flex-wrap: wrap;
-}
-.hero-stat { text-align: center; }
-.hero-stat .num { font-family: var(--font-display); font-size: 1.3rem; color: var(--navy); display: block; }
-.hero-stat .label { font-size: 0.72rem; color: var(--text-muted); }
-.hero-image {
-  position: relative; overflow: hidden;
-}
-.hero-image img {
-  width: 100%; height: 100%; object-fit: cover;
-}
-.hero-image::before {
-  content: ''; position: absolute; top: 0; right: 0; bottom: 0;
-  width: 80px; z-index: 2;
-  background: linear-gradient(to left, var(--blush), transparent);
+.btn-secondary:hover {
+  background: rgba(255,255,255,0.2);
+  border-color: rgba(255,255,255,0.4);
+  transform: translateY(-2px);
 }
 
 /* ─── SECTIONS ─── */
-.section { padding: 48px 72px; }
+.section {
+  padding: var(--space-3xl) var(--space-2xl);
+  max-width: 1280px; margin: 0 auto;
+}
 .section-eyebrow {
-  color: var(--teal); font-size: 0.68rem; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 2px; margin-bottom: 6px;
+  color: var(--teal); font-size: 0.72rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 3px; margin-bottom: var(--space-sm);
 }
 .section-title {
   font-family: var(--font-body); font-weight: 800;
-  font-size: clamp(1.5rem, 2.6vw, 2.2rem); color: var(--navy); margin-bottom: 24px;
+  font-size: clamp(1.8rem, 3vw, 2.6rem);
+  color: var(--navy); margin-bottom: var(--space-xl);
+  letter-spacing: -0.02em; line-height: 1.2;
 }
 
 /* ─── CATEGORY TABS ─── */
-.cat-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px; }
+.cat-tabs { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: var(--space-xl); }
 .cat-tab {
-  background: var(--white); border: 1.5px solid #E0E0E0; color: var(--text-muted);
-  padding: 8px 18px; border-radius: var(--radius-pill);
-  font-family: var(--font-body); font-size: 0.82rem; font-weight: 500;
-  cursor: pointer; transition: all 0.2s ease;
-  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--white); border: 1.5px solid var(--border);
+  color: var(--text-secondary);
+  padding: 10px 22px; border-radius: var(--radius-pill);
+  font-family: var(--font-body); font-size: 0.85rem; font-weight: 500;
+  cursor: pointer; transition: all var(--dur-normal) var(--ease-out);
+  display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;
 }
-.cat-tab:hover { border-color: var(--navy); color: var(--navy); }
-.cat-tab.active { background: var(--navy); border-color: var(--navy); color: white; }
+.cat-tab:hover {
+  border-color: var(--navy); color: var(--navy);
+  background: var(--navy-light); transform: translateY(-1px);
+}
+.cat-tab.active {
+  background: var(--navy); border-color: var(--navy); color: white;
+  box-shadow: 0 4px 12px rgba(26,31,54,0.2); transform: translateY(-1px);
+}
+.cat-tab span { transition: transform var(--dur-normal) var(--ease-bounce); }
+.cat-tab:hover span, .cat-tab.active span { transform: scale(1.15); }
 
-/* ─── PRODUCTS HEADER ─── */
+/* ─── PRODUCTS ─── */
 .products-header {
   display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 18px;
+  margin-bottom: var(--space-lg);
 }
-.products-count { font-size: 0.82rem; color: var(--text-muted); }
+.products-count { font-size: 0.85rem; color: var(--text-muted); }
 .sort-select {
-  padding: 8px 14px; border: 1.5px solid #E0E0E0; border-radius: var(--radius-md);
-  font-family: var(--font-body); font-size: 0.82rem; color: var(--text);
-  background: white; cursor: pointer;
+  padding: 10px 18px; border: 1.5px solid var(--border);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-body); font-size: 0.82rem;
+  color: var(--text); background: var(--white); cursor: pointer;
+  transition: border-color var(--dur-fast) ease;
+  appearance: none;
+  padding-left: 36px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235A6178' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: 14px center;
 }
+.sort-select:focus { outline: none; border-color: var(--navy); }
 
-/* ─── PRODUCT GRID ─── */
-.product-grid {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px;
-}
-.grid-featured {
-  display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; margin-bottom: 24px;
-}
+.product-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-lg); }
+.grid-featured { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-lg); margin-bottom: var(--space-xl); }
 
 /* ─── PRODUCT CARD ─── */
 .card {
-  background: var(--white); border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-card); overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-  animation: fadeUp 0.5s ease both;
+  background: var(--white);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border-light);
+  overflow: hidden;
+  transition: all var(--dur-normal) var(--ease-out);
 }
-.card:hover { transform: translateY(-5px); box-shadow: var(--shadow-hover); }
+.card:hover {
+  transform: translateY(-6px);
+  box-shadow: var(--shadow-hover);
+  border-color: transparent;
+}
 .card-image-wrap {
-  position: relative; overflow: hidden; aspect-ratio: 4/3;
-  background: var(--gold-bg);
+  position: relative; overflow: hidden;
+  aspect-ratio: 4/3; background: var(--border-light);
 }
 .grid-featured .card-image-wrap { aspect-ratio: 3/2; }
 .card-image-wrap img {
   width: 100%; height: 100%; object-fit: cover;
-  transition: transform 0.5s ease;
+  transition: transform var(--dur-slow) var(--ease-out);
 }
-.card:hover .card-image-wrap img { transform: scale(1.06); }
+.card:hover .card-image-wrap img { transform: scale(1.08); }
+.card-image-wrap::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(to top, rgba(26,31,54,0.4) 0%, transparent 50%);
+  opacity: 0; transition: opacity var(--dur-normal) ease;
+}
+.card:hover .card-image-wrap::after { opacity: 1; }
+
 .badge {
-  position: absolute; top: 12px; left: 12px;
-  padding: 4px 12px; border-radius: var(--radius-pill);
-  font-size: 0.68rem; font-weight: 700;
+  position: absolute; top: var(--space-md); left: var(--space-md);
+  padding: 5px 14px; border-radius: var(--radius-pill);
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.3px;
+  z-index: 2; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
 }
-.badge-top { background: var(--navy); color: var(--gold); }
-.badge-drop { background: var(--rose); color: white; }
-.badge-new { background: var(--teal); color: white; }
+.badge-top { background: rgba(26,31,54,0.85); color: var(--gold); }
+.badge-drop { background: rgba(212,112,90,0.9); color: white; }
+.badge-new { background: rgba(74,158,158,0.9); color: white; }
+
 .wishlist-btn {
-  position: absolute; top: 12px; right: 12px;
-  width: 34px; height: 34px; border-radius: 50%;
-  background: rgba(255,255,255,0.9); border: none; cursor: pointer;
-  font-size: 1.1rem; display: flex; align-items: center; justify-content: center;
-  transition: transform 0.2s ease;
+  position: absolute; top: var(--space-md); right: var(--space-md);
+  width: 36px; height: 36px; border-radius: 50%;
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  border: none; cursor: pointer; font-size: 1.1rem;
+  display: flex; align-items: center; justify-content: center;
+  z-index: 2; transition: all var(--dur-fast) var(--ease-bounce);
+  box-shadow: var(--shadow-xs);
 }
-.wishlist-btn:hover { transform: scale(1.15); }
-.wishlist-btn.active { color: #EF4444; }
-.card-body { padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+.wishlist-btn:hover { transform: scale(1.15); background: white; }
+.wishlist-btn.active { color: #EF4444; animation: pulseGlow 0.6s ease; }
+
+.card-body { padding: var(--space-lg); display: flex; flex-direction: column; gap: 10px; }
 .category-labels { display: flex; flex-wrap: wrap; gap: 6px; }
 .category-label {
   display: inline-flex; align-items: center; gap: 4px;
-  color: var(--teal); font-size: 0.68rem; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 1px;
-  background: rgba(61,140,140,0.08); padding: 2px 8px; border-radius: var(--radius-pill);
+  color: var(--teal); font-size: 0.68rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.5px;
+  background: var(--teal-light); padding: 3px 10px; border-radius: var(--radius-pill);
 }
 .card-title {
-  font-weight: 700; font-size: 1.1rem; line-height: 1.4;
+  font-weight: 700; font-size: 1.05rem; line-height: 1.5; color: var(--text);
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
-.rating-row {
-  display: flex; align-items: center; gap: 6px; font-size: 0.78rem;
-}
+.rating-row { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; }
 .stars { color: var(--gold); letter-spacing: 1px; }
 .rating-num { font-weight: 600; color: var(--text); }
 .rating-count { color: var(--text-muted); }
+
 .card-footer {
   display: flex; justify-content: space-between; align-items: center;
-  margin-top: 4px; padding-top: 12px; border-top: 1px solid #f0f0f0;
+  margin-top: var(--space-sm); padding-top: var(--space-md);
+  border-top: 1px solid var(--border-light);
 }
 .price-wrap { display: flex; align-items: baseline; gap: 8px; }
-.price-original {
-  text-decoration: line-through; color: var(--text-muted); font-size: 0.82rem;
-}
-.price-current { font-family: var(--font-display); font-size: 1.2rem; color: var(--navy); }
+.price-original { text-decoration: line-through; color: var(--text-muted); font-size: 0.82rem; }
+.price-current { font-family: var(--font-display); font-size: 1.3rem; color: var(--navy); font-weight: 700; }
 .price-current.sale { color: var(--rose); }
+.discount-pct {
+  background: var(--rose-light); color: var(--rose);
+  font-size: 0.68rem; font-weight: 700;
+  padding: 2px 8px; border-radius: var(--radius-pill);
+}
 .btn-cta {
   display: inline-flex; align-items: center; gap: 6px;
-  background: var(--rose); color: white;
-  padding: 8px 18px; border-radius: var(--radius-pill);
+  background: var(--navy); color: white;
+  padding: 10px 20px; border-radius: var(--radius-pill);
   font-family: var(--font-body); font-size: 0.78rem; font-weight: 600;
-  text-decoration: none; transition: background 0.2s ease;
+  text-decoration: none; transition: all var(--dur-normal) var(--ease-out); border: none;
 }
-.btn-cta:hover { background: var(--rose-hover); }
+.btn-cta:hover {
+  background: var(--navy-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(26,31,54,0.2);
+}
 .btn-cta svg { transform: scaleX(-1); }
 
 /* ─── RANK BAR ─── */
-.rank-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.rank-row { display: flex; align-items: center; gap: var(--space-sm); margin-bottom: var(--space-xs); }
 .rank-number { font-family: var(--font-display); font-size: 1rem; color: var(--navy); font-weight: 700; min-width: 28px; }
-.rank-bar-bg { flex: 1; height: 6px; background: #eee; border-radius: 3px; overflow: hidden; }
-.rank-bar-fill { height: 100%; border-radius: 3px; background: linear-gradient(to left, var(--gold), var(--rose)); }
+.rank-bar-bg { flex: 1; height: 4px; background: var(--border-light); border-radius: 2px; overflow: hidden; }
+.rank-bar-fill { height: 100%; border-radius: 2px; background: linear-gradient(to left, var(--gold), var(--rose)); transition: width 0.8s var(--ease-out); }
 
-/* ─── TRUST BAR ─── */
-.trust-section { background: var(--navy); padding: 40px 72px; }
-.trust-pillars {
-  display: flex; justify-content: center; align-items: center; gap: 40px;
+/* ─── TRUST ─── */
+.trust-section { background: var(--navy); padding: var(--space-3xl) var(--space-2xl); }
+.trust-inner { max-width: 1200px; margin: 0 auto; }
+.trust-heading { text-align: center; color: white; font-weight: 700; font-size: 1.4rem; margin-bottom: var(--space-xl); }
+.trust-pillars { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-lg); }
+.trust-pillar {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg); text-align: center;
+  transition: all var(--dur-normal) var(--ease-out);
 }
-.trust-divider { width: 1px; height: 48px; background: rgba(255,255,255,0.15); }
-.trust-pillar { display: flex; align-items: center; gap: 14px; }
+.trust-pillar:hover { background: rgba(255,255,255,0.08); transform: translateY(-4px); }
 .trust-icon {
-  width: 40px; height: 40px; border-radius: 50%;
-  background: rgba(255,255,255,0.1);
+  width: 48px; height: 48px; border-radius: var(--radius-md);
+  background: rgba(255,255,255,0.08);
   display: flex; align-items: center; justify-content: center;
-  font-size: 1.1rem; flex-shrink: 0;
+  font-size: 1.3rem; margin: 0 auto var(--space-md);
 }
-.trust-text-title { color: white; font-weight: 600; font-size: 0.82rem; }
-.trust-text-desc { color: var(--text-light); font-size: 0.72rem; }
+.trust-text-title { color: white; font-weight: 700; font-size: 0.88rem; margin-bottom: var(--space-xs); }
+.trust-text-desc { color: var(--text-light); font-size: 0.75rem; line-height: 1.6; }
 .disclosure-bar {
-  background: var(--blush); padding: 14px 72px;
-  text-align: center; font-size: 0.72rem; color: var(--text-muted); line-height: 1.6;
+  background: var(--navy-light); padding: var(--space-md) var(--space-2xl);
+  text-align: center; font-size: 0.75rem; color: var(--text-muted);
+  line-height: 1.7; border-top: 1px solid var(--border);
 }
 
 /* ─── PAGE HEADER ─── */
 .page-header {
-  background: var(--blush); padding: 48px 72px 36px;
+  background: linear-gradient(135deg, var(--navy) 0%, #2D3350 100%);
+  padding: 120px var(--space-2xl) var(--space-3xl);
   text-align: center;
 }
 .page-header .eyebrow {
-  color: var(--teal); font-size: 0.68rem; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;
+  color: var(--gold); font-size: 0.72rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 3px; margin-bottom: var(--space-sm);
 }
 .page-header h1 {
   font-family: var(--font-body); font-weight: 800;
-  font-size: clamp(1.5rem, 2.6vw, 2.2rem); color: var(--navy); margin-bottom: 8px;
+  font-size: clamp(2rem, 3.5vw, 3rem); color: white;
+  margin-bottom: var(--space-sm); letter-spacing: -0.02em;
 }
-.page-header .subtitle { color: var(--text-muted); font-size: 0.88rem; }
+.page-header .subtitle { color: var(--text-light); font-size: 0.95rem; font-weight: 300; }
 
 /* ─── EMPTY STATE ─── */
-.empty-state {
-  text-align: center; padding: 64px 24px;
-}
-.empty-icon { font-size: 3rem; margin-bottom: 16px; }
-.empty-state p { font-size: 1rem; color: var(--text); font-weight: 600; margin-bottom: 8px; }
-.empty-state small { color: var(--text-muted); font-size: 0.82rem; }
+.empty-state { text-align: center; padding: var(--space-3xl) var(--space-lg); }
+.empty-icon { font-size: 3.5rem; margin-bottom: var(--space-lg); animation: float 3s ease-in-out infinite; }
+.empty-state p { font-size: 1.1rem; color: var(--text); font-weight: 700; margin-bottom: var(--space-sm); }
+.empty-state small { color: var(--text-muted); font-size: 0.85rem; }
 
 /* ─── ABOUT ─── */
-.about-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center; }
-.about-image { border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-card); }
-.about-image img { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; }
-.about-eyebrow { color: var(--teal); font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px; }
-.about-h2 { font-weight: 800; font-size: 1.4rem; color: var(--navy); margin-bottom: 16px; }
-.about-p { color: var(--text-muted); font-weight: 300; line-height: 1.8; margin-bottom: 12px; font-size: 0.92rem; }
-.values-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px; }
-.value-card {
-  background: var(--blush); border-radius: var(--radius-md); padding: 16px;
+.about-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2xl); align-items: center; }
+.about-image { border-radius: var(--radius-xl); overflow: hidden; box-shadow: var(--shadow-card); }
+.about-image img {
+  width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block;
+  transition: transform var(--dur-slow) var(--ease-out);
 }
-.value-card .vi { font-size: 1.2rem; margin-bottom: 6px; }
-.value-card .vt { font-weight: 700; font-size: 0.82rem; color: var(--navy); }
-.value-card .vd { font-size: 0.72rem; color: var(--text-muted); margin-top: 4px; }
-.team-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 48px; }
+.about-image:hover img { transform: scale(1.03); }
+.about-eyebrow { color: var(--teal); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 3px; margin-bottom: var(--space-sm); }
+.about-h2 { font-weight: 800; font-size: 1.6rem; color: var(--navy); margin-bottom: var(--space-lg); letter-spacing: -0.02em; }
+.about-p { color: var(--text-secondary); font-weight: 300; line-height: 1.9; margin-bottom: var(--space-md); font-size: 0.95rem; }
+.values-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-md); margin-top: var(--space-xl); }
+.value-card {
+  background: var(--white); border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg); padding: var(--space-lg);
+  transition: all var(--dur-normal) var(--ease-out);
+}
+.value-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-sm); }
+.value-card .vi { font-size: 1.3rem; margin-bottom: var(--space-sm); }
+.value-card .vt { font-weight: 700; font-size: 0.85rem; color: var(--navy); }
+.value-card .vd { font-size: 0.75rem; color: var(--text-muted); margin-top: var(--space-xs); }
+.team-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-xl); margin-top: var(--space-3xl); }
 .team-card { text-align: center; }
 .team-avatar {
-  width: 64px; height: 64px; border-radius: 50%; background: var(--navy);
+  width: 72px; height: 72px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--navy), var(--navy-hover));
   display: flex; align-items: center; justify-content: center;
-  font-size: 1.5rem; margin: 0 auto 12px;
+  font-size: 1.6rem; margin: 0 auto var(--space-md);
+  box-shadow: var(--shadow-sm);
 }
-.team-name { font-weight: 700; font-size: 0.92rem; color: var(--navy); }
-.team-role { font-size: 0.78rem; color: var(--text-muted); margin-top: 4px; }
+.team-name { font-weight: 700; font-size: 0.95rem; color: var(--navy); }
+.team-role { font-size: 0.78rem; color: var(--text-muted); margin-top: var(--space-xs); }
 .contact-bar {
-  background: var(--navy); padding: 32px 72px; margin-top: 48px;
-  display: flex; justify-content: center; gap: 48px; flex-wrap: wrap;
+  background: var(--navy); padding: var(--space-xl) var(--space-2xl);
+  margin-top: var(--space-3xl);
+  display: flex; justify-content: center; gap: var(--space-2xl);
+  flex-wrap: wrap; border-radius: var(--radius-xl);
+  max-width: 1200px; margin-left: auto; margin-right: auto;
 }
-.contact-item { color: white; font-size: 0.88rem; display: flex; align-items: center; gap: 8px; }
+.contact-item {
+  color: white; font-size: 0.88rem;
+  display: flex; align-items: center; gap: var(--space-sm);
+  transition: opacity var(--dur-fast) ease;
+}
+.contact-item:hover { opacity: 0.8; }
 
 /* ─── FOOTER ─── */
-.footer {
-  background: var(--dark-footer); padding: 28px 72px;
-  display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
+.footer { background: var(--dark-footer); padding: var(--space-xl) var(--space-2xl); }
+.footer-inner {
+  max-width: 1200px; margin: 0 auto;
+  display: flex; justify-content: space-between; align-items: center;
+  flex-wrap: wrap; gap: var(--space-lg);
 }
 .footer-logo {
   background: none; border: none; cursor: pointer;
-  font-family: var(--font-display); font-size: 1.2rem; color: white;
-  direction: ltr; display: flex; align-items: center; gap: 4px;
+  font-family: var(--font-display); font-size: 1.3rem; color: white;
+  direction: ltr; display: flex; align-items: center; gap: 6px;
 }
 .footer-logo .gold { color: var(--gold); }
-.footer-links { display: flex; gap: 8px; list-style: none; }
-.footer-links button {
+.footer-center { display: flex; gap: var(--space-md); list-style: none; }
+.footer-center button {
   background: none; border: none; cursor: pointer;
-  color: rgba(255,255,255,0.5); font-family: var(--font-body);
-  font-size: 0.78rem; transition: color 0.2s ease;
+  color: rgba(255,255,255,0.45); font-family: var(--font-body);
+  font-size: 0.82rem; transition: color var(--dur-fast) ease; padding: 4px 0;
 }
-.footer-links button:hover { color: white; }
-.footer-copy { color: rgba(255,255,255,0.3); font-size: 0.72rem; }
-
+.footer-center button:hover { color: white; }
+.footer-social { display: flex; gap: var(--space-sm); }
+.footer-social-link {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+  display: flex; align-items: center; justify-content: center;
+  color: rgba(255,255,255,0.5); font-size: 0.9rem; cursor: pointer;
+  transition: all var(--dur-fast) ease;
+}
+.footer-social-link:hover {
+  background: rgba(255,255,255,0.12); color: white; transform: translateY(-2px);
+}
+.footer-bottom {
+  max-width: 1200px; margin: var(--space-lg) auto 0;
+  padding-top: var(--space-lg);
+  border-top: 1px solid rgba(255,255,255,0.06); text-align: center;
+}
+.footer-copy { color: rgba(255,255,255,0.25); font-size: 0.72rem; }
 
 /* ─── RESPONSIVE ─── */
 @media (max-width: 1100px) {
   .product-grid { grid-template-columns: repeat(2, 1fr); }
-  .section { padding: 36px; }
+  .hero-inner { grid-template-columns: 1fr; text-align: center; }
+  .hero-content { align-items: center; }
+  .hero-subtitle { margin: 0 auto; }
+  .hero-cta-row { justify-content: center; }
+  .hero-stats-grid { grid-template-columns: repeat(4, 1fr); max-width: 600px; margin: 0 auto; }
+  .section { padding: var(--space-2xl) var(--space-xl); }
+  .trust-pillars { grid-template-columns: repeat(2, 1fr); }
 }
-@media (max-width: 768px) {
-  .nav { padding: 0 14px; }
-  .nav-links button { font-size: 0.72rem; padding: 5px 8px; }
-  .hero { grid-template-columns: 1fr; min-height: auto; }
-  .hero-image { height: 200px; order: -1; }
-  .hero-image::before { display: none; }
-  .hero-content { padding: 26px 16px; }
-  .hero-stats { flex-wrap: wrap; gap: 14px; }
-  .section, .page-header { padding-left: 16px; padding-right: 16px; }
-  .product-grid, .grid-featured { grid-template-columns: 1fr; }
-  .trust-pillars { flex-direction: column; align-items: flex-start; gap: 14px; }
-  .trust-divider { display: none; }
-  .trust-section { padding: 28px 16px; }
-  .disclosure-bar { padding: 14px 16px; }
-  .about-grid { grid-template-columns: 1fr; }
-  .values-grid { grid-template-columns: 1fr; }
-  .team-grid { grid-template-columns: 1fr 1fr; }
-  .products-header { flex-direction: column; align-items: flex-start; gap: 10px; }
-  .footer { flex-direction: column; align-items: flex-start; padding: 20px 16px; }
 
-  .contact-bar { padding: 24px 16px; gap: 24px; }
+@media (max-width: 768px) {
+  .nav { padding: 0 var(--space-md); height: 56px; }
+  .nav-links button { font-size: 0.72rem; padding: 6px 10px; }
+
+  .hero { min-height: 80vh; }
+  .hero-inner { padding: 100px var(--space-md) var(--space-2xl); gap: var(--space-xl); }
+  .hero h1 { font-size: clamp(1.8rem, 7vw, 2.4rem); }
+  .hero-stats-grid { grid-template-columns: repeat(2, 1fr); gap: var(--space-sm); }
+  .hero-stat-card { padding: var(--space-md); }
+  .hero-stat-card .stat-num { font-size: 1.4rem; }
+
+  .section { padding: var(--space-xl) var(--space-md); }
+  .section-title { font-size: 1.5rem; margin-bottom: var(--space-lg); }
+
+  .cat-tabs {
+    flex-wrap: nowrap; overflow-x: auto;
+    -webkit-overflow-scrolling: touch; scrollbar-width: none;
+    padding-bottom: 4px;
+    margin-left: -16px; margin-right: -16px;
+    padding-left: 16px; padding-right: 16px;
+  }
+  .cat-tabs::-webkit-scrollbar { display: none; }
+
+  .product-grid, .grid-featured { grid-template-columns: 1fr; }
+
+  .page-header { padding: 100px var(--space-md) var(--space-xl); }
+
+  .trust-pillars { grid-template-columns: 1fr; }
+  .trust-section { padding: var(--space-xl) var(--space-md); }
+  .disclosure-bar { padding: var(--space-md); }
+
+  .about-grid { grid-template-columns: 1fr; gap: var(--space-xl); }
+  .values-grid { grid-template-columns: 1fr 1fr; }
+  .team-grid { grid-template-columns: 1fr 1fr; gap: var(--space-md); }
+
+  .products-header { flex-direction: column; align-items: flex-start; gap: var(--space-sm); }
+
+  .footer-inner { flex-direction: column; align-items: center; text-align: center; }
+  .footer { padding: var(--space-xl) var(--space-md); }
+
+  .contact-bar { padding: var(--space-lg) var(--space-md); gap: var(--space-lg); border-radius: var(--radius-lg); margin: var(--space-xl) var(--space-md) 0; }
+}
+
+@media (max-width: 480px) {
+  .hero-stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .hero-cta-row { flex-direction: column; width: 100%; }
+  .btn-primary, .btn-secondary { width: 100%; justify-content: center; }
+  .values-grid { grid-template-columns: 1fr; }
+  .team-grid { grid-template-columns: 1fr; }
 }
 `;
 
@@ -478,6 +748,14 @@ const FALLBACK_IMG = 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?
 /* ─── COMPONENTS ─── */
 
 function Nav({ currentPage, onNavigate }) {
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 60);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   const pages = [
     { id: 'home', label: 'ראשי' },
     { id: 'recommended', label: 'המלצות שלנו' },
@@ -486,7 +764,7 @@ function Nav({ currentPage, onNavigate }) {
     { id: 'about', label: 'אודות' },
   ];
   return (
-    <nav className="nav">
+    <nav className={`nav ${scrolled ? 'scrolled' : ''}`}>
       <button className="nav-logo" onClick={() => onNavigate('home')}>
         🐾 <span>Paw</span><span className="gold">Finds</span>
       </button>
@@ -508,6 +786,9 @@ function ProductCard({ product, categories, rank, maxReviews }) {
   const [wished, setWished] = useState(false);
   const cats = categories.filter(c => product.category_ids.includes(c.id));
   const hasDiscount = product.original_price && product.original_price.trim() !== '';
+  const discountPct = hasDiscount
+    ? Math.round((1 - parseFloat(product.price) / parseFloat(product.original_price)) * 100)
+    : 0;
   const badgeClass = product.badge === 'top' ? 'badge-top' : product.badge === 'drop' ? 'badge-drop' : product.badge === 'new' ? 'badge-new' : '';
 
   return (
@@ -539,6 +820,7 @@ function ProductCard({ product, categories, rank, maxReviews }) {
           <div className="price-wrap">
             {hasDiscount && <span className="price-original">₪{product.original_price}</span>}
             <span className={`price-current ${hasDiscount ? 'sale' : ''}`}>₪{product.price}</span>
+            {hasDiscount && discountPct > 0 && <span className="discount-pct">-{discountPct}%</span>}
           </div>
           <a href={product.affiliate_link !== '#' ? product.affiliate_link : '#'} target="_blank" rel="nofollow noopener sponsored" className="btn-cta">
             לבדיקת מחיר
@@ -568,6 +850,7 @@ function CategoryTabs({ categories, activeFilter, onFilterChange }) {
 }
 
 function TrustBar() {
+  const [ref, vis] = useScrollReveal();
   const pillars = [
     { icon: '🔍', title: 'מחקר עצמאי', desc: 'בודקים לפני שממליצים' },
     { icon: '⭐', title: 'רק דירוגים גבוהים', desc: 'לפחות 4.5★ מהמוכר' },
@@ -576,20 +859,18 @@ function TrustBar() {
   ];
   return (
     <>
-      <div className="trust-section">
-        <div className="trust-pillars">
-          {pillars.map((p, i) => (
-            <React.Fragment key={i}>
-              {i > 0 && <div className="trust-divider" />}
-              <div className="trust-pillar">
+      <div className="trust-section" ref={ref}>
+        <div className="trust-inner">
+          <h3 className="trust-heading">למה לסמוך עלינו?</h3>
+          <div className={`trust-pillars stagger ${vis ? 'visible' : ''}`}>
+            {pillars.map((p, i) => (
+              <div key={i} className="trust-pillar">
                 <div className="trust-icon">{p.icon}</div>
-                <div>
-                  <div className="trust-text-title">{p.title}</div>
-                  <div className="trust-text-desc">{p.desc}</div>
-                </div>
+                <div className="trust-text-title">{p.title}</div>
+                <div className="trust-text-desc">{p.desc}</div>
               </div>
-            </React.Fragment>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
       <div className="disclosure-bar">
@@ -624,6 +905,7 @@ function PageHeader({ eyebrow, title, subtitle }) {
 function HomePage({ products, categories, onNavigate }) {
   const [filter, setFilter] = useState('all');
   const [sort, setSort] = useState('default');
+  const [gridRef, gridVis] = useScrollReveal();
 
   const filtered = filter === 'all' ? products : products.filter(p => p.category_ids.includes(filter));
   const sorted = applySorting(filtered, sort);
@@ -632,22 +914,46 @@ function HomePage({ products, categories, onNavigate }) {
     <>
       {/* HERO */}
       <div className="hero">
-        <div className="hero-content">
-          <div className="hero-pill">✦ נבדק ונבחר בקפידה</div>
-          <h1>מוצרים מעולים לחבר ה<em>כי אהוב</em> שלך — במחיר שמפתיע לטובה</h1>
-          <p className="hero-subtitle">אנחנו בודקים, משווים וממליצים על מוצרי חיות המחמד הכי שווים — כדי שתוכלו לפנק בלי לחשוב פעמיים.</p>
-          <div className="hero-cta-row">
-            <button className="btn-primary" onClick={() => onNavigate('recommended')}>המלצות שלנו ←</button>
-            <button className="btn-secondary" onClick={() => onNavigate('new')}>חדש בחנות</button>
-          </div>
-          <div className="hero-stats">
-            <div className="hero-stat"><span className="num">{products.length}+</span><span className="label">מוצרים שנבדקו</span></div>
-            <div className="hero-stat"><span className="num">4.8★</span><span className="label">ממוצע דירוג</span></div>
-            <div className="hero-stat"><span className="num">12K+</span><span className="label">בעלי חיות שמחים</span></div>
-          </div>
+        <div className="hero-bg">
+          <img src="https://images.unsplash.com/photo-1587300003388-59208cc962cb?w=1600&h=900&fit=crop" alt="" onError={(e) => { e.target.src = FALLBACK_IMG; }} />
         </div>
-        <div className="hero-image">
-          <img src="https://images.unsplash.com/photo-1587300003388-59208cc962cb?w=800&h=600&fit=crop" alt="כלב שמח" onError={(e) => { e.target.src = FALLBACK_IMG; }} />
+        <div className="hero-inner">
+          <div className="hero-content">
+            <div className="hero-pill">✦ נבדק ונבחר בקפידה</div>
+            <h1>מוצרים מעולים לחבר ה<em>כי אהוב</em> שלך</h1>
+            <p className="hero-subtitle">אנחנו בודקים, משווים וממליצים על מוצרי חיות המחמד הכי שווים — כדי שתוכלו לפנק בלי לחשוב פעמיים.</p>
+            <div className="hero-cta-row">
+              <button className="btn-primary" onClick={() => onNavigate('recommended')}>
+                המלצות שלנו
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{transform:'scaleX(-1)'}}>
+                  <path d="M5 12h14M12 5l7 7-7 7"/>
+                </svg>
+              </button>
+              <button className="btn-secondary" onClick={() => onNavigate('new')}>חדש בחנות</button>
+            </div>
+          </div>
+          <div className="hero-stats-grid">
+            <div className="hero-stat-card">
+              <span className="stat-icon">📦</span>
+              <span className="stat-num">{products.length}+</span>
+              <span className="stat-label">מוצרים שנבדקו</span>
+            </div>
+            <div className="hero-stat-card">
+              <span className="stat-icon">⭐</span>
+              <span className="stat-num">4.8</span>
+              <span className="stat-label">ממוצע דירוג</span>
+            </div>
+            <div className="hero-stat-card">
+              <span className="stat-icon">💙</span>
+              <span className="stat-num">12K+</span>
+              <span className="stat-label">בעלי חיות שמחים</span>
+            </div>
+            <div className="hero-stat-card">
+              <span className="stat-icon">🏆</span>
+              <span className="stat-num">100%</span>
+              <span className="stat-label">מחקר עצמאי</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -666,9 +972,9 @@ function HomePage({ products, categories, onNavigate }) {
             <option value="rating">לפי דירוג</option>
           </select>
         </div>
-        <div className="product-grid">
-          {sorted.map((p, i) => (
-            <ProductCard key={p.id} product={p} categories={categories} style={{ animationDelay: `${i * 0.065}s` }} />
+        <div ref={gridRef} className={`product-grid stagger ${gridVis ? 'visible' : ''}`}>
+          {sorted.map((p) => (
+            <ProductCard key={p.id} product={p} categories={categories} />
           ))}
         </div>
       </div>
@@ -679,6 +985,7 @@ function HomePage({ products, categories, onNavigate }) {
 }
 
 function RecommendedPage({ products, categories }) {
+  const [ref, vis] = useScrollReveal();
   const list = products.filter(p => p.is_recommended);
   if (list.length === 0) {
     return (
@@ -693,15 +1000,15 @@ function RecommendedPage({ products, categories }) {
   return (
     <>
       <PageHeader eyebrow="✦ נבחר בקפידה" title="המלצות שלנו" />
-      <div className="section">
+      <div className="section" ref={ref}>
         {featured.length > 0 && (
-          <div className="grid-featured">
-            {featured.map((p, i) => <ProductCard key={p.id} product={p} categories={categories} />)}
+          <div className={`grid-featured stagger ${vis ? 'visible' : ''}`}>
+            {featured.map((p) => <ProductCard key={p.id} product={p} categories={categories} />)}
           </div>
         )}
         {rest.length > 0 && (
-          <div className="product-grid">
-            {rest.map((p, i) => <ProductCard key={p.id} product={p} categories={categories} />)}
+          <div className={`product-grid stagger ${vis ? 'visible' : ''}`}>
+            {rest.map((p) => <ProductCard key={p.id} product={p} categories={categories} />)}
           </div>
         )}
       </div>
@@ -710,16 +1017,17 @@ function RecommendedPage({ products, categories }) {
 }
 
 function NewPage({ products, categories }) {
+  const [ref, vis] = useScrollReveal();
   const list = products.filter(p => p.is_new);
   return (
     <>
       <PageHeader eyebrow="🆕 זה עתה הגיע" title="חדש בחנות" />
-      <div className="section">
+      <div className="section" ref={ref}>
         {list.length === 0 ? (
           <EmptyState icon="🆕" message="אין מוצרים חדשים כרגע" hint="סמן is_new=yes בקובץ ה-CSV" />
         ) : (
-          <div className="product-grid">
-            {list.map((p, i) => <ProductCard key={p.id} product={p} categories={categories} />)}
+          <div className={`product-grid stagger ${vis ? 'visible' : ''}`}>
+            {list.map((p) => <ProductCard key={p.id} product={p} categories={categories} />)}
           </div>
         )}
       </div>
@@ -728,16 +1036,17 @@ function NewPage({ products, categories }) {
 }
 
 function BestsellersPage({ products, categories }) {
+  const [ref, vis] = useScrollReveal();
   const list = products.filter(p => p.is_bestseller).sort((a, b) => b.reviews - a.reviews);
   const maxReviews = list[0]?.reviews ?? 1;
   return (
     <>
       <PageHeader eyebrow="🔥 בוחרים הכי הרבה" title="הנמכרים ביותר" />
-      <div className="section">
+      <div className="section" ref={ref}>
         {list.length === 0 ? (
           <EmptyState icon="🔥" message="אין מוצרים מסומנים כנמכרים ביותר" hint="סמן is_bestseller=yes בקובץ ה-CSV" />
         ) : (
-          <div className="product-grid">
+          <div className={`product-grid stagger ${vis ? 'visible' : ''}`}>
             {list.map((p, i) => <ProductCard key={p.id} product={p} categories={categories} rank={i} maxReviews={maxReviews} />)}
           </div>
         )}
@@ -747,19 +1056,20 @@ function BestsellersPage({ products, categories }) {
 }
 
 function AboutPage({ onNavigate }) {
+  const [ref, vis] = useScrollReveal();
   return (
     <>
       <PageHeader eyebrow="👋 מי אנחנו" title="אודות PawFinds" />
-      <div className="section">
-        <div className="about-grid">
+      <div className="section" ref={ref}>
+        <div className={`about-grid reveal ${vis ? 'visible' : ''}`}>
           <div className="about-image">
             <img src="https://images.unsplash.com/photo-1450778869180-cfe0112515ba?w=600&h=450&fit=crop" alt="חיות מחמד" onError={(e) => { e.target.src = FALLBACK_IMG; }} />
           </div>
           <div>
-            <p className="about-eyebrow">הסיפור שלנו</p>
-            <h2 className="about-h2">נולדנו מאהבה לחיות מחמד</h2>
-            <p className="about-p">התחלנו כקבוצה של חובבי חיות שנמאס להם לקנות מוצרים שלא עומדים בציפיות. אחרי עשרות רכישות מאכזבות, החלטנו לעשות את המחקר בעצמנו — ולחלוק את הממצאים עם כולם.</p>
-            <p className="about-p">כל מוצר באתר עבר בדיקה קפדנית. אנחנו קוראים אלפי ביקורות, בודקים דירוגים, משווים מחירים ובוחרים רק את מה שבאמת שווה את הכסף.</p>
+            <p className="about-eyebrow">הסיפור שלי</p>
+            <h2 className="about-h2">נולדתי מאהבה לחיות מחמד</h2>
+            <p className="about-p">התחלתי כחובב חיות שנמאס לו לקנות מוצרים שלא עומדים בציפיות. אחרי עשרות רכישות מאכזבות, החלטתי לעשות את המחקר בעצמי — ולחלוק את הממצאים עם כולם.</p>
+            <p className="about-p">כל מוצר באתר עבר בדיקה קפדנית. אני קורא אלפי ביקורות, בודק דירוגים, משווה מחירים ובוחר רק את מה שבאמת שווה את הכסף.</p>
             <div className="values-grid">
               <div className="value-card"><div className="vi">🔍</div><div className="vt">שקיפות מלאה</div><div className="vd">גילוי נאות על כל קישור</div></div>
               <div className="value-card"><div className="vi">💙</div><div className="vt">רק הטוב ביותר</div><div className="vd">סינון קפדני של מוצרים</div></div>
@@ -769,21 +1079,11 @@ function AboutPage({ onNavigate }) {
           </div>
         </div>
 
-        <div className="team-grid">
-          <div className="team-card">
-            <div className="team-avatar">👩</div>
-            <div className="team-name">מיכל כהן</div>
-            <div className="team-role">מייסדת & בודקת ראשית</div>
-          </div>
-          <div className="team-card">
+        <div className="team-grid" style={{justifyItems:'center'}}>
+          <div className="team-card" style={{gridColumn:'1 / -1'}}>
             <div className="team-avatar">👨</div>
-            <div className="team-name">עמית לוי</div>
-            <div className="team-role">מומחה ציוד טכנולוגי</div>
-          </div>
-          <div className="team-card">
-            <div className="team-avatar">👩</div>
-            <div className="team-name">נועה שרון</div>
-            <div className="team-role">כותבת תוכן & חובבת חתולים</div>
+            <div className="team-name">יואב הרט</div>
+            <div className="team-role">מייסד & מנהל האתר</div>
           </div>
         </div>
       </div>
@@ -807,15 +1107,24 @@ function Footer({ onNavigate }) {
   ];
   return (
     <footer className="footer">
-      <button className="footer-logo" onClick={() => onNavigate('home')}>
-        🐾 <span>Paw</span><span className="gold">Finds</span>
-      </button>
-      <ul className="footer-links">
-        {pages.map(p => (
-          <li key={p.id}><button onClick={() => onNavigate(p.id)}>{p.label}</button></li>
-        ))}
-      </ul>
-      <span className="footer-copy">© 2026 PawFinds. כל הזכויות שמורות.</span>
+      <div className="footer-inner">
+        <button className="footer-logo" onClick={() => onNavigate('home')}>
+          🐾 <span>Paw</span><span className="gold">Finds</span>
+        </button>
+        <ul className="footer-center">
+          {pages.map(p => (
+            <li key={p.id}><button onClick={() => onNavigate(p.id)}>{p.label}</button></li>
+          ))}
+        </ul>
+        <div className="footer-social">
+          <span className="footer-social-link" aria-label="Instagram">📷</span>
+          <span className="footer-social-link" aria-label="Facebook">👤</span>
+          <span className="footer-social-link" aria-label="Twitter">🐦</span>
+        </div>
+      </div>
+      <div className="footer-bottom">
+        <span className="footer-copy">© 2026 PawFinds. כל הזכויות שמורות.</span>
+      </div>
     </footer>
   );
 }
